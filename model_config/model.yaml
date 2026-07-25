@@ -1,7 +1,7 @@
 meta:
-  name: databot-llm
+  name: tramibot-llm
   version: 1.0.0
-  description: Configuración del LLM y memoria para el agente DataBot (DATAPATH).
+  description: Configuración del LLM y memoria para el agente TramiBot (Municipio de Girardota).
   updated_at: 2026-06-05
   author: Ing. Kevin Inofuente Colque - DataPath
 

@@ -1,6 +1,6 @@
 """
 Agente IA Completo: Base de Conocimiento + Internet + Histórico + Langfuse
-- Tool 1: Base de Conocimiento (RAG con Pinecone)
+- Tool 1: Base de Conocimiento (RAG con Qdrant)
 - Tool 2: Búsqueda en Internet (Tavily)
 - Histórico: Guarda conversaciones en PostgreSQL
 - Observabilidad: Langfuse (trazas, tokens, costos, latencia)
@@ -31,9 +31,10 @@ from langfuse import observe, propagate_attributes
 from langfuse.langchain import CallbackHandler
 
 # Importar tools desde la carpeta tools/
-from tools.Base_de_conocimiento import buscar_datapath
-from tools.Busqueda_internet import buscar_internet
+from tools.Base_de_conocimiento import buscar_tramites
 from tools.Hora_y_fecha import obtener_fecha_hora
+# buscar_internet desactivada para el agente municipal (ver lista `tools` más abajo).
+# from tools.Busqueda_internet import buscar_internet
 
 # Importar guardrail de entrada (Capa 1 de Seguridad)
 from guardrails.input_guardrail import verificar_input_guardrail, respuesta_bloqueada
@@ -50,6 +51,9 @@ from chat_history import crear_tabla_historial, get_session_history
 # Importar config del modelo (desacoplada del código) desde model_config/
 from model_config import load_model_config
 
+# Importar el system prompt desde YAML (desacoplado del código) desde prompt/
+from prompt import load_system_prompt
+
 # LANGFUSE ▶ Cliente Langfuse singleton (Langfuse() + get_client() → observability/)
 from observability.langfuse_setup import langfuse_client
 
@@ -57,9 +61,10 @@ from observability.langfuse_setup import langfuse_client
 # 2. LISTA DE TOOLS DISPONIBLES
 # ============================================
 tools = [
-    buscar_datapath,      # Base de conocimiento DATAPATH
-    buscar_internet,      # Búsqueda en internet (Tavily)
-    obtener_fecha_hora,   # Fecha y hora actual por zona horaria
+    buscar_tramites,      # Base de conocimiento de trámites del Municipio de Girardota
+    obtener_fecha_hora,   # Fecha y hora actual por zona horaria (plazos/días hábiles)
+    # buscar_internet,    # Desactivada: el agente municipal responde solo desde el
+                          # Manual oficial (evita alucinaciones de la web abierta).
 ]
 
 # ============================================
@@ -89,70 +94,37 @@ def _contexto_fecha_hora() -> str:
 
 
 
-# system_prompt = """Eres DataBot, el asistente virtual oficial de DATAPATH — escuela de formación en Inteligencia Artificial y tecnología.
-
-# Tu ÚNICO propósito es responder consultas relacionadas con DATAPATH: programas, cursos, precios, modalidades, docentes, inscripciones, fechas de inicio, beneficios y cualquier información institucional.
-
-# Al inicio de cada turno se te indica la FECHA Y HORA ACTUAL; úsala cuando la respuesta dependa de "hoy", "ahora", "esta semana", horarios o plazos. Para otras zonas horarias usa la tool obtener_fecha_hora.
-
-# <Herramientas>
-# 1. buscar_datapath: Para información interna de DATAPATH (programas, cursos, precios, docentes, inscripciones)
-# 2. buscar_internet: Para buscar información de DATAPATH en internet (reseñas, menciones, comparativas del sector de formación en IA en Perú). La búsqueda siempre se realiza en el contexto de DATAPATH automáticamente.
-# 3. obtener_fecha_hora: Para la fecha y hora actual
-# 4. transferir_a_humano: Para transferir la conversación a un asesor humano y desactivar la IA
-# </Herramientas>
-
-# <Instrucciones>
-# - Para preguntas sobre DATAPATH → USA buscar_datapath PRIMERO; si no hay suficiente info, complementa con buscar_internet
-# - Para "qué hora es", "qué día es hoy" → USA obtener_fecha_hora
-# - Para saludos y despedidas → Responde directamente, pero redirige amablemente al tema DATAPATH
-# - NUNCA respondas preguntas de cultura general, noticias, política, deportes, ciencia u otros temas ajenos a DATAPATH
-# - Si la pregunta no es sobre DATAPATH, rechaza amablemente usando el Mensaje de Rechazo
-# - Recuerdas toda la conversación gracias a tu memoria persistente
-# - Responde siempre en español de manera clara, profesional y amigable
-# - Si el usuario pide hablar con un humano, asesor o representante → USA transferir_a_humano INMEDIATAMENTE y luego informa al usuario que un asesor le atenderá pronto
-# </Instrucciones>
-
-# <Ejemplos_Si>
-# - "Hola" → Saluda y ofrece ayuda con DATAPATH
-# - "¿Qué cursos tienen?" → Usa buscar_datapath
-# - "¿Cuánto cuesta el programa de IA?" → Usa buscar_datapath
-# - "¿Cuándo empieza el próximo módulo?" → Usa buscar_datapath + obtener_fecha_hora
-# - "¿Tienen buenas reseñas?" → Usa buscar_internet
-# - "Quiero hablar con un asesor" → Usa transferir_a_humano
-# - "Necesito atención personalizada / un humano / una persona real" → Usa transferir_a_humano
-# </Ejemplos_Si>
-
-# <Ejemplos_No>
-# - "¿Qué día son las elecciones en Perú?" → Rechaza: no es un tema de DATAPATH
-# - "¿Qué pasó hoy en las noticias?" → Rechaza: no es un tema de DATAPATH
-# - "¿Cuál es la capital de Francia?" → Rechaza: no es un tema de DATAPATH
-# - "Explícame cómo funciona Python" → Rechaza: para eso están los cursos de DATAPATH
-# </Ejemplos_No>
-
-# <Mensaje_de_Rechazo>
-# Esa consulta está fuera de mi ámbito. Soy DataBot y estoy especializado en información sobre los programas y servicios de DATAPATH. ¿Te puedo ayudar con información sobre nuestros cursos, precios, fechas de inicio o inscripciones?
-# </Mensaje_de_Rechazo>"""
+# El system prompt del agente (TramiBot · Municipio de Girardota) vive en
+# prompt/system_prompt.yaml y se carga con load_system_prompt() más abajo.
 
 
+
+# ============================================
+# OPCIÓN ACTIVA: PROMPT DESDE YAML (prompt/system_prompt.yaml)
+# --------------------------------------------
+# El system prompt vive desacoplado en prompt/system_prompt.yaml y se carga con
+# load_system_prompt(). Para ajustar la persona del agente solo se edita el YAML.
+# ============================================
+system_prompt = load_system_prompt()
+print("📝 Prompt cargado desde YAML: prompt/system_prompt.yaml")
 
 # ============================================
 # ALTERNATIVA: PROMPT DESDE LANGFUSE (Prompt Management)
 # --------------------------------------------
 # Para usarlo:
 #   1. Ve a Langfuse UI → Prompts → Create Prompt
-#   2. Nombre: "databot-system-prompt"   Tipo: text
-#   3. Pega el contenido del system_prompt de arriba
+#   2. Nombre: "Prompt-del-Agente-para-Whatsapp-v2"   Tipo: text
+#   3. Pega el contenido del system_prompt del YAML
 #   4. Asigna el label "production"
-#   5. Comenta el bloque system_prompt = """...""" de arriba
+#   5. Comenta las 2 líneas de load_system_prompt() de arriba
 #   6. Descomenta el bloque de abajo
 #
 # Ventaja: puedes cambiar el prompt desde la UI sin tocar código ni reiniciar el servidor
 # Desventaja: el prompt sale del repo y no puedes editarlo con vibe coding en Cursor
 # ============================================
-lf_prompt = langfuse_client.get_prompt("Prompt-del-Agente-para-Whatsapp-v2")
-system_prompt = lf_prompt.compile()   # sin variables; si tuvieras usa compile(var=valor)
-print(f"📝 Prompt cargado desde Langfuse: versión {lf_prompt.version}")
+# lf_prompt = langfuse_client.get_prompt("Prompt-del-Agente-para-Whatsapp-v2")
+# system_prompt = lf_prompt.compile()   # sin variables; si tuvieras usa compile(var=valor)
+# print(f"📝 Prompt cargado desde Langfuse: versión {lf_prompt.version}")
 
 # ============================================
 # 5. CREAR TABLA DE HISTORIAL (chat_history/)
@@ -189,7 +161,7 @@ def chat_con_agente(
         # LANGFUSE v4 ▶ propagate_attributes() reemplaza update_current_trace() para
         #               atributos de correlación (tags, session_id, etc.)
         with propagate_attributes(
-            trace_name="databot-guardrail-bloqueado",  # LANGFUSE v4 ▶ 'name' ahora es 'trace_name'
+            trace_name="tramibot-guardrail-bloqueado",  # LANGFUSE v4 ▶ 'name' ahora es 'trace_name'
             session_id=session_id,
             tags=["guardrail", "bloqueado"],
         ):
@@ -237,10 +209,10 @@ def chat_con_agente(
     #               trace_name: nombre visible en el dashboard (antes era 'name' en update_current_trace)
     #               metadata debe ser dict[str, str] con valores ≤ 200 chars (restricción de v4)
     with propagate_attributes(
-        trace_name="databot-turno",                          # LANGFUSE v4 ▶ nombre del trace en el dashboard
+        trace_name="tramibot-turno",                         # LANGFUSE v4 ▶ nombre del trace en el dashboard
         session_id=session_id,                               # LANGFUSE v4 ▶ agrupa trazas por conversación
         user_id=f"conv-{session_id[:8]}",                    # LANGFUSE v4 ▶ identifica al usuario en métricas
-        tags=["produccion", "chatwoot", "databot"],          # LANGFUSE v4 ▶ etiquetas para filtrar
+        tags=["produccion", "chatwoot", "tramibot"],         # LANGFUSE v4 ▶ etiquetas para filtrar
         metadata={"modelo": _model_cfg["llm"]["model"]},     # LANGFUSE v4 ▶ dict[str,str] obligatorio en v4
     ):
         # LANGFUSE ▶ config={"callbacks": [langfuse_handler]} activa el tracing de TODO el
@@ -279,7 +251,7 @@ def chat_con_agente(
 # ============================================
 def main():
     print("=" * 60)
-    print("🤖 DataBot - Agente COMPLETO (BC + Internet + Memoria)")
+    print("🤖 TramiBot - Agente de Trámites del Municipio de Girardota")
     print("=" * 60)
     print("🔧 Tools disponibles:")
     for t in tools:
@@ -305,7 +277,7 @@ def main():
     
     print(f"\n📝 Session ID: {session_id}")
     print("   (Guarda este ID para continuar después)")
-    print("✅ El agente puede buscar en DATAPATH y en INTERNET")
+    print("✅ El agente responde trámites del Municipio de Girardota (base de conocimiento)")
     print("Escribe 'salir' para volver al menú.\n")
     
     while True:
@@ -325,7 +297,7 @@ def main():
         
         try:
             respuesta = chat_con_agente(usuario, session_id)
-            print(f"\n🤖 DataBot: {respuesta}\n")
+            print(f"\n🤖 TramiBot: {respuesta}\n")
         except Exception as e:
             print(f"\n❌ Error: {e}\n")
 

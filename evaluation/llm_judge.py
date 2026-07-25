@@ -1,15 +1,15 @@
 """
-LLM-as-a-Judge: evaluación automática de respuestas de DataBot.
+LLM-as-a-Judge: evaluación automática de respuestas de TramiBot.
 
-Usa un LLM barato (GPT-4o-mini) para evaluar cada respuesta del agente en cinco
-dimensiones y envía los scores a Langfuse.
+Usa un LLM barato (GPT-4o-mini) para evaluar cada respuesta del agente de trámites
+del Municipio de Girardota en cinco dimensiones y envía los scores a Langfuse.
 
 Scores registrados:
-  - relevancia-datapath : ¿La respuesta habló solo de DATAPATH?
+  - relevancia-tramites : ¿La respuesta habló de trámites/servicios del municipio?
   - calidad-respuesta   : ¿Fue útil, clara y correcta?
-  - alucinacion         : ¿Inventó datos que no puede conocer (precios, fechas)?
-  - llamada-a-accion    : ¿Invitó al usuario a dar el siguiente paso comercial?
-  - rechazo-correcto    : ¿Rechazó bien preguntas fuera del ámbito de DATAPATH?
+  - alucinacion         : ¿Inventó requisitos, documentos, tiempos, costos o dependencias?
+  - completitud-tramite : ¿Entregó la información clave del trámite solicitado?
+  - rechazo-correcto    : ¿Rechazó bien preguntas fuera del ámbito municipal?
 
 Diseño intencionado:
 - Módulo independiente: no importa nada del agente, solo Langfuse y LangChain.
@@ -42,11 +42,11 @@ _chat_judge = init_chat_model("gpt-4o-mini", temperature=0)
 # ============================================
 # Pide un JSON con exactamente 6 campos. Las llaves dobles {{ }} son
 # literales en str.format() (escapan las llaves del JSON de la respuesta).
-_JUDGE_PROMPT = """Eres un evaluador experto de chatbots de atención al cliente.
+_JUDGE_PROMPT = """Eres un evaluador experto de chatbots de atención ciudadana.
 
-Evalúa la siguiente interacción del chatbot DataBot de DATAPATH (escuela de IA en Perú).
+Evalúa la siguiente interacción de TramiBot, el asistente virtual de trámites del Municipio de Girardota (Colombia).
 
-MENSAJE DEL USUARIO:
+MENSAJE DEL CIUDADANO:
 {mensaje}
 
 RESPUESTA DEL BOT:
@@ -57,17 +57,17 @@ Evalúa en cinco dimensiones y responde ÚNICAMENTE con JSON válido (sin markdo
   "relevancia": <float 0.0-1.0>,
   "calidad": <float 0.0-1.0>,
   "alucinacion": <float 0.0-1.0>,
-  "llamada_accion": <float 0.0-1.0>,
+  "completitud": <float 0.0-1.0>,
   "rechazo_correcto": <float 0.0-1.0>,
   "razon": "<máximo 100 caracteres>"
 }}
 
 Definiciones:
-- relevancia:       ¿La respuesta está enfocada en DATAPATH? 0=nada relevante, 1=totalmente relevante
+- relevancia:       ¿La respuesta está enfocada en trámites o servicios del Municipio de Girardota? 0=nada relevante, 1=totalmente relevante
 - calidad:          ¿La respuesta es útil, clara y correcta? 0=pésima, 1=excelente
-- alucinacion:      ¿El bot inventó datos específicos que no puede conocer (precios exactos, fechas, nombres de docentes, porcentajes)? 0=no inventó nada, 1=inventó datos concretos. Si la pregunta no aplica, pon 0.
-- llamada_accion:   ¿La respuesta invitó al usuario a dar un siguiente paso comercial (inscribirse, contactar asesor, pedir temario, visitar web)? 0=no hubo llamada a la acción, 1=llamada a la acción clara y natural. Si la pregunta no aplica (ej. saludo simple), pon 0.5.
-- rechazo_correcto: Si el usuario preguntó algo fuera del ámbito de DATAPATH, ¿el bot lo rechazó correctamente con amabilidad? 0=respondió sin rechazar (MAL), 1=rechazó correctamente (BIEN). Si la pregunta SÍ era sobre DATAPATH, pon 1.
+- alucinacion:      ¿El bot inventó datos específicos que no puede conocer (requisitos, documentos, tiempos de obtención, costos, nombres de secretarías/dependencias)? 0=no inventó nada, 1=inventó datos concretos. Si la pregunta no aplica, pon 0.
+- completitud:      Cuando el ciudadano pregunta por un trámite, ¿la respuesta entregó la información clave solicitada (propósito, requisitos/documentos, tiempo de obtención y/o dependencia responsable)? 0=muy incompleta, 1=completa y accionable. Si la pregunta no aplica (ej. un saludo), pon 0.5.
+- rechazo_correcto: Si el ciudadano preguntó algo fuera del ámbito del municipio (otro municipio, cultura general, etc.), ¿el bot lo rechazó correctamente con amabilidad? 0=respondió sin rechazar (MAL), 1=rechazó correctamente (BIEN). Si la pregunta SÍ era sobre el municipio, pon 1.
 - razon:            Razón breve que justifica los puntajes más bajos o llamativos"""
 
 
@@ -80,21 +80,21 @@ def evaluar_con_llm_judge(
     trace_id: str,
 ) -> None:
     """
-    Evalúa la respuesta de DataBot con un LLM juez y envía los scores a Langfuse.
+    Evalúa la respuesta de TramiBot con un LLM juez y envía los scores a Langfuse.
 
     Scores que se registran (todos float 0-1):
-      - "relevancia-datapath" : ¿La respuesta habló solo de DATAPATH?
+      - "relevancia-tramites" : ¿La respuesta habló de trámites/servicios del municipio?
       - "calidad-respuesta"   : ¿Fue útil, clara y correcta?
-      - "alucinacion"         : ¿Inventó precios, fechas u otros datos concretos?
-      - "llamada-a-accion"    : ¿Invitó al usuario a inscribirse o contactar a DATAPATH?
-      - "rechazo-correcto"    : ¿Rechazó bien preguntas fuera del ámbito de DATAPATH?
+      - "alucinacion"         : ¿Inventó requisitos, documentos, tiempos u otros datos?
+      - "completitud-tramite" : ¿Entregó la información clave del trámite solicitado?
+      - "rechazo-correcto"    : ¿Rechazó bien preguntas fuera del ámbito municipal?
 
     Todos los scores quedan visibles en:
       Langfuse UI → Tracing → (click en el trace) → sección Scores
       Langfuse UI → Evaluation → Scores → Analytics
 
     Args:
-        mensaje_usuario: El mensaje que envió el usuario en este turno.
+        mensaje_usuario: El mensaje que envió el ciudadano en este turno.
         respuesta_final: La respuesta que generó el agente.
         trace_id:        El trace_id de Langfuse del turno actual.
     """
@@ -114,7 +114,7 @@ def evaluar_con_llm_judge(
         relevancia       = max(0.0, min(1.0, float(eval_data.get("relevancia",       0.0))))
         calidad          = max(0.0, min(1.0, float(eval_data.get("calidad",          0.0))))
         alucinacion      = max(0.0, min(1.0, float(eval_data.get("alucinacion",      0.0))))
-        llamada_accion   = max(0.0, min(1.0, float(eval_data.get("llamada_accion",   0.0))))
+        completitud      = max(0.0, min(1.0, float(eval_data.get("completitud",      0.0))))
         rechazo_correcto = max(0.0, min(1.0, float(eval_data.get("rechazo_correcto", 1.0))))
         razon            = str(eval_data.get("razon", ""))[:100]
 
@@ -124,7 +124,7 @@ def evaluar_con_llm_judge(
         # Langfuse v4: método create_score() — enviar los 5 scores al trace actual
         lf.create_score(
             trace_id=trace_id,
-            name="relevancia-datapath",
+            name="relevancia-tramites",
             value=relevancia,
             data_type="NUMERIC",
             comment=razon,
@@ -144,11 +144,11 @@ def evaluar_con_llm_judge(
             data_type="NUMERIC",
             comment=razon,
         )
-        # llamada-a-accion: 0=no invitó a nada, 1=llamada a la acción clara
+        # completitud-tramite: 0=respuesta incompleta, 1=entregó la info clave del trámite
         lf.create_score(
             trace_id=trace_id,
-            name="llamada-a-accion",
-            value=llamada_accion,
+            name="completitud-tramite",
+            value=completitud,
             data_type="NUMERIC",
             comment=razon,
         )
@@ -166,7 +166,7 @@ def evaluar_con_llm_judge(
             f"relevancia={relevancia:.2f} | "
             f"calidad={calidad:.2f} | "
             f"alucinacion={alucinacion:.2f} | "
-            f"cta={llamada_accion:.2f} | "
+            f"completitud={completitud:.2f} | "
             f"rechazo={rechazo_correcto:.2f} | "
             f"{razon[:50]}"
         )

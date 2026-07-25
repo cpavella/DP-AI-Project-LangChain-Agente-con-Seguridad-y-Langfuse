@@ -38,27 +38,25 @@ except ImportError:
 @tool
 def buscar_internet(consulta: str) -> str:
     """
-    Busca información actualizada sobre DATAPATH en internet usando Tavily.
-    Usa esta herramienta ÚNICAMENTE para complementar información sobre DATAPATH:
-    - Reseñas o menciones de DATAPATH en medios
-    - Comparación de DATAPATH con el mercado de formación en IA en Perú
-    - Noticias recientes del sector de cursos de IA que ayuden a contextualizar DATAPATH
-    - Información de DATAPATH que no esté en la base de conocimientos interna
+    Busca información pública actualizada sobre el Municipio de Girardota en
+    internet usando Tavily (p. ej. datos de contacto, direcciones, horarios de
+    atención o comunicados oficiales que no estén en la base de conocimiento).
+    Usa esta herramienta ÚNICAMENTE para complementar información del municipio.
 
     NUNCA uses esta herramienta para:
     - Preguntas de cultura general (política, deportes, noticias, ciencia)
-    - Temas no relacionados con DATAPATH o formación en IA
+    - Temas no relacionados con el Municipio de Girardota o sus trámites
 
     Args:
-        consulta: El aspecto de DATAPATH o del sector de formación en IA a buscar
+        consulta: El aspecto del Municipio de Girardota a buscar
     """
-    # Forzar que la búsqueda siempre esté en el contexto de DATAPATH
-    consulta_datapath = f"DATAPATH escuela IA Peru {consulta}"
-    print(f"   🌐 Buscando en internet: '{consulta_datapath}'")
-    
+    # Forzar que la búsqueda siempre esté en el contexto del municipio
+    consulta_municipio = f"Municipio de Girardota {consulta}"
+    print(f"   🌐 Buscando en internet: '{consulta_municipio}'")
+
     try:
-        # Ejecutar búsqueda (siempre con contexto DATAPATH)
-        resultados = tavily_search.invoke(consulta_datapath)
+        # Ejecutar búsqueda (siempre con contexto del municipio)
+        resultados = tavily_search.invoke(consulta_municipio)
         
         if not resultados:
             return "No encontré información relevante en internet."

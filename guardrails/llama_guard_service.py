@@ -17,7 +17,7 @@ Estrategia:
   - Si pasa, ejecuta GPT-OSS-Safeguard (profundo, contenido NSFW)
 
 Adaptación de async → sync respecto al código original del amigo,
-porque el agente DataBot es síncrono (CLI script).
+porque el agente TramiBot es síncrono (CLI script).
 
 Requiere: pip install groq
           GROQ_API_KEY en el archivo .env

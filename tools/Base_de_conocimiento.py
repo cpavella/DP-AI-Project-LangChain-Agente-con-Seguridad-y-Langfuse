@@ -1,6 +1,7 @@
 """
 Tool: Base de Conocimiento (RAG con Qdrant)
-Permite buscar información en la base de conocimientos de DATAPATH.
+Permite buscar información en la base de conocimiento de trámites del
+Municipio de Girardota (Manual de Trámites).
 
 Consume una colección existente de Qdrant (self-hosted en DigitalOcean) vía
 QDRANT_URL + QDRANT_API_KEY. La colección debe haberse creado con embeddings
@@ -50,15 +51,20 @@ vectorstore = QdrantVectorStore.from_existing_collection(
     api_key=QDRANT_API_KEY,
     port=_qdrant_port,
     prefer_grpc=False,   # REST; usa True solo si expones gRPC (6334)
+    # El pipeline de ingesta (rag/pipeline/f_metadata.py → build_payloads) guarda
+    # el texto del chunk en el payload bajo la clave "text", NO bajo el default
+    # "page_content" de QdrantVectorStore. Sin esto, similarity_search devuelve
+    # documentos con page_content vacío y el agente responde "no se encontró".
+    content_payload_key="text",
 )
 
 
 # ============================================
 # FUNCIÓN INTERNA DE BÚSQUEDA
 # ============================================
-def buscar_en_base_conocimiento_interno(query: str, top_k: int = 5) -> str:
+def buscar_en_base_conocimiento_interno(query: str, top_k: int = 8) -> str:
     """
-    Función interna de búsqueda RAG con Pinecone.
+    Función interna de búsqueda RAG con Qdrant.
 
     Args:
         query: Consulta de búsqueda
@@ -87,18 +93,20 @@ def buscar_en_base_conocimiento_interno(query: str, top_k: int = 5) -> str:
 # TOOL EXPORTABLE
 # ============================================
 @tool
-def buscar_datapath(consulta: str) -> str:
+def buscar_tramites(consulta: str) -> str:
     """
-    Busca información sobre DATAPATH en la base de conocimientos.
-    Usa esta herramienta cuando el usuario pregunte sobre:
-    - Programas de DATAPATH
-    - Cursos y contenidos
-    - Docentes e instructores
-    - Precios y modalidades
-    - Cualquier información relacionada con DATAPATH
+    Busca información sobre los trámites y servicios del Municipio de Girardota
+    en la base de conocimiento oficial (Manual de Trámites).
+    Usa esta herramienta cuando el ciudadano pregunte sobre:
+    - Requisitos y documentos de un trámite
+    - Propósito o en qué consiste un trámite
+    - Tiempo de obtención / plazos
+    - Costos del trámite
+    - Secretaría o dependencia responsable
+    - Cualquier información sobre trámites del municipio
 
     Args:
-        consulta: La pregunta o tema a buscar
+        consulta: La pregunta o trámite a buscar
     """
     print(f"   🔍 Buscando: '{consulta}'")
     resultado = buscar_en_base_conocimiento_interno(consulta)

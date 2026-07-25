@@ -1,13 +1,13 @@
 """
 PiiDetector — Capa 5 de Seguridad: Detección de Datos Personales Sensibles (PII)
 
-Detecta información personal en mensajes de usuarios para Perú y LATAM.
+Detecta información personal en mensajes de usuarios para Colombia.
 
 Entidades detectadas:
-  - DNI         → Documento Nacional de Identidad (8 dígitos)
-  - RUC         → Registro Único de Contribuyentes (11 dígitos)
+  - Cédula      → Cédula de Ciudadanía (8-10 dígitos)
+  - NIT         → Número de Identificación Tributaria (9 dígitos + verificación)
   - Email       → Correo electrónico
-  - Teléfono    → Formato peruano (+51 / 9XXXXXXXX)
+  - Teléfono    → Formato colombiano (+57 / 3XXXXXXXXX)
   - Tarjeta     → Números de tarjeta de crédito/débito (13-19 dígitos)
 
 Acción configurable por entidad:
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # Cambiar acción por entidad según necesidad del proyecto
 # ============================================================
 PII_CONFIG: Dict[str, str] = {
-    "DNI_PE":       "block",   # DNI peruano — 8 dígitos
-    "RUC_PE":       "block",   # RUC — 11 dígitos (10/15/17/20 + 9 dígitos)
+    "CEDULA_CO":    "block",   # Cédula de Ciudadanía — 8-10 dígitos
+    "NIT_CO":       "block",   # NIT — 9 dígitos + dígito de verificación
     "EMAIL":        "block",   # Correo electrónico
-    "PHONE_PE":     "block",   # Teléfono peruano
+    "PHONE_CO":     "block",   # Teléfono/celular colombiano
     "CREDIT_CARD":  "block",   # Tarjeta de crédito/débito
 }
 
@@ -45,17 +45,17 @@ PII_CONFIG: Dict[str, str] = {
 # PATRONES REGEX POR ENTIDAD
 # ============================================================
 _PII_PATTERNS = {
-    "DNI_PE": re.compile(
-        r"\b\d{8}\b"
+    "CEDULA_CO": re.compile(
+        r"\b\d{8,10}\b"
     ),
-    "RUC_PE": re.compile(
-        r"\b(10|15|17|20)\d{9}\b"
+    "NIT_CO": re.compile(
+        r"\b\d{9}-?\d\b"
     ),
     "EMAIL": re.compile(
         r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b"
     ),
-    "PHONE_PE": re.compile(
-        r"(\+51|51)?\s*9\d{2}[\s\-]?\d{3}[\s\-]?\d{3}\b"
+    "PHONE_CO": re.compile(
+        r"(\+?57)?\s*3\d{2}[\s\-]?\d{3}[\s\-]?\d{4}\b"
     ),
     "CREDIT_CARD": re.compile(
         r"\b(?:4[0-9]{12}(?:[0-9]{3})?|"       # Visa
@@ -94,29 +94,29 @@ class PiiDetector:
 
             analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["es", "en"])
 
-            # Reconocedor: DNI Perú
+            # Reconocedor: Cédula de Ciudadanía (Colombia)
             analyzer.registry.add_recognizer(PatternRecognizer(
-                supported_entity="DNI_PE",
-                patterns=[Pattern("DNI_PE", r"\b\d{8}\b", 0.7)],
+                supported_entity="CEDULA_CO",
+                patterns=[Pattern("CEDULA_CO", r"\b\d{8,10}\b", 0.7)],
                 supported_language="es",
             ))
 
-            # Reconocedor: RUC Perú
+            # Reconocedor: NIT (Colombia)
             analyzer.registry.add_recognizer(PatternRecognizer(
-                supported_entity="RUC_PE",
-                patterns=[Pattern("RUC_PE", r"\b(10|15|17|20)\d{9}\b", 0.85)],
+                supported_entity="NIT_CO",
+                patterns=[Pattern("NIT_CO", r"\b\d{9}-?\d\b", 0.85)],
                 supported_language="es",
             ))
 
-            # Reconocedor: Teléfono Perú
+            # Reconocedor: Teléfono/celular Colombia
             analyzer.registry.add_recognizer(PatternRecognizer(
-                supported_entity="PHONE_PE",
-                patterns=[Pattern("PHONE_PE", r"(\+51|51)?\s*9\d{2}[\s\-]?\d{3}[\s\-]?\d{3}\b", 0.75)],
+                supported_entity="PHONE_CO",
+                patterns=[Pattern("PHONE_CO", r"(\+?57)?\s*3\d{2}[\s\-]?\d{3}[\s\-]?\d{4}\b", 0.75)],
                 supported_language="es",
             ))
 
             self._presidio_analyzer = analyzer
-            logger.info("[PII] Presidio inicializado con reconocedores para Perú (ES)")
+            logger.info("[PII] Presidio inicializado con reconocedores para Colombia (ES)")
 
         except ImportError:
             logger.info("[PII] Presidio no instalado — usando detección por regex puro")
@@ -129,7 +129,7 @@ class PiiDetector:
         cuya acción es 'block'.
 
         Returns:
-            Lista de strings con los tipos detectados, ej: ["DNI_PE", "EMAIL"]
+            Lista de strings con los tipos detectados, ej: ["CEDULA_CO", "EMAIL"]
             Lista vacía si el mensaje es seguro.
         """
         if not texto or not texto.strip():

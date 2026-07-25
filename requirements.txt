@@ -36,6 +36,24 @@ langchain-qdrant          # Integración LangChain + Qdrant (incluye qdrant-clie
 pypdf>=3.0.0              # Loader de PDFs (PyPDFLoader)
 
 # ============================================
+# PIPELINE DE INGESTA RAG UNIVERSAL (rag/pipeline/)
+# --------------------------------------------
+# Pipeline multi-tenant: PDF→Markdown, validación/OCR, chunking estructural,
+# metadata idempotente y upsert a Qdrant. Embeddings vía OpenAI (ada-002).
+# ============================================
+PyMuPDF                   # pymupdf — extracción nativa + OCR (get_textpage_ocr)
+pymupdf4llm               # PDF → Markdown (headers/tablas) para chunking estructural
+llama-index-core          # MarkdownNodeParser + SentenceSplitter (e_chunking)
+numpy                     # Matrices de embeddings (ya requerido arriba)
+# OCR español requiere el binario Tesseract del sistema + idiomas:
+#   macOS:  brew install tesseract tesseract-lang
+#   Linux:  apt-get install tesseract-ocr tesseract-ocr-spa
+
+# --- Fuentes de documentos OPCIONALES (rag/pipeline/*_source.py) ---
+# google-cloud-storage    # Fuente GCS (gcs_source.py)
+# msal                    # Login device-code Microsoft Graph (graph_source.py)
+
+# ============================================
 # TOOLS
 # ============================================
 langchain-tavily          # Búsqueda en internet (Tavily) - Nueva API

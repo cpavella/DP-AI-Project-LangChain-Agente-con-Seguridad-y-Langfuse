@@ -25,7 +25,9 @@ load_dotenv(find_dotenv())
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Importar directamente el agente (sin rutas locales)
+#from agente_sec_langfuse import chat_con_agente
 from agente_sec_langfuse import chat_con_agente
+
 
 # Importar factory de la tool de handoff
 from tools.Transferir_humano import crear_tool_transferir_humano
@@ -33,8 +35,8 @@ from tools.Transferir_humano import crear_tool_transferir_humano
 # Buffer de mensajes (concatena mensajes seguidos en una sola respuesta)
 from message_buffer import encolar_mensaje, BUFFER_ENABLED, BUFFER_WINDOW_SECONDS
 
-print("🤖 Cargando Agente D (Pinecone)...")
-print("✅ Agente D cargado correctamente")
+print("🤖 Cargando TramiBot (RAG con Qdrant)...")
+print("✅ TramiBot cargado correctamente")
 
 # ============================================
 # CONFIGURACIÓN DE CHATWOOT
@@ -152,8 +154,8 @@ def ejecutar_agente_y_responder(
 # FASTAPI APP
 # ============================================
 app = FastAPI(
-    title="DataBot - Agente IA con Chatwoot",
-    description="Webhook para integrar el Agente D con Chatwoot",
+    title="TramiBot - Agente de Trámites (Municipio de Girardota) con Chatwoot",
+    description="Webhook para integrar el agente TramiBot con Chatwoot",
     version="1.0.0"
 )
 
@@ -162,7 +164,7 @@ app = FastAPI(
 async def chatwoot_webhook(request: Request):
     """
     Endpoint que recibe los webhooks de Chatwoot.
-    Procesa mensajes entrantes y responde usando el Agente D.
+    Procesa mensajes entrantes y responde usando TramiBot.
     """
     data = await request.json()
     
@@ -201,7 +203,7 @@ async def chatwoot_webhook(request: Request):
 
     print(f"   📝 Mensaje: {message_content[:100]}...")
 
-    # Procesar con el Agente D
+    # Procesar con TramiBot
     try:
         # ── Modo BUFFER: acumular mensajes seguidos y responder UNA sola vez ──
         # Si el usuario manda "hola", "todo bien?", "tengo una consulta" seguidos,
@@ -218,7 +220,7 @@ async def chatwoot_webhook(request: Request):
             return {"status": "buffered", "conversation_id": conversation_id}
 
         # ── Modo directo: responder mensaje por mensaje (buffer desactivado) ──
-        print(f"   🤖 Procesando con Agente D...")
+        print(f"   🤖 Procesando con TramiBot...")
         await asyncio.to_thread(
             ejecutar_agente_y_responder, conversation_id, contact_id, message_content
         )
@@ -237,11 +239,11 @@ async def chatwoot_webhook(request: Request):
 def read_root():
     """Endpoint raíz con información del servicio."""
     return {
-        "service": "DataBot - Agente IA",
+        "service": "TramiBot - Agente de Trámites (Municipio de Girardota)",
         "version": "1.0.0",
-        "agent": "Agente D (RAG + Internet + Memoria)",
+        "agent": "TramiBot (RAG + Memoria)",
         "model": "GPT-4.1",
-        "tools": ["buscar_datapath", "buscar_internet", "obtener_fecha_hora", "transferir_a_humano"],
+        "tools": ["buscar_tramites", "obtener_fecha_hora", "transferir_a_humano"],
         "chatwoot_configured": all([CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID, CHATWOOT_API_TOKEN]),
         "bot_label": BOT_LABEL,
         "status": "ready"
@@ -253,7 +255,7 @@ def health_check():
     """Endpoint de salud del servicio."""
     return {
         "status": "healthy",
-        "agent": "Agente D",
+        "agent": "TramiBot",
         "chatwoot": "connected" if all([CHATWOOT_BASE_URL, CHATWOOT_ACCOUNT_ID, CHATWOOT_API_TOKEN]) else "not configured"
     }
 
@@ -264,11 +266,11 @@ def health_check():
 if __name__ == "__main__":
     print()
     print("=" * 60)
-    print("🚀 INICIANDO DATABOT CON CHATWOOT")
+    print("🚀 INICIANDO TRAMIBOT CON CHATWOOT")
     print("=" * 60)
-    print(f"🤖 Agente: D (RAG + Internet + Memoria)")
+    print(f"🤖 Agente: TramiBot - Trámites del Municipio de Girardota (RAG + Memoria)")
     print(f"🧠 Modelo: GPT-4.1")
-    print(f"🔧 Tools: buscar_datapath, buscar_internet, obtener_fecha_hora, transferir_a_humano")
+    print(f"🔧 Tools: buscar_tramites, obtener_fecha_hora, transferir_a_humano")
     print(f"💾 Historial: PostgreSQL")
     print(f"🏷️  Etiqueta bot (handoff): {BOT_LABEL or 'ninguna'}")
     print(f"🚫 No responde si tiene tag: {TAG_IA_OFF}")

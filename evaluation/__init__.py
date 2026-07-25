@@ -1,5 +1,5 @@
 """
-Módulo de evaluación automática para DataBot.
+Módulo de evaluación automática para TramiBot.
 
 Contiene evaluadores desacoplados del agente principal.
 Actualmente incluye LLM-as-a-Judge; se pueden agregar más en el futuro.

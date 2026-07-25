@@ -32,8 +32,8 @@ from message_buffer.redis_client import get_redis
 logger = logging.getLogger(__name__)
 
 # Claves de Redis por conversación
-_MSGS_KEY = "databot:buffer:msgs:{conv}"   # lista con los mensajes acumulados
-_SEQ_KEY = "databot:buffer:seq:{conv}"     # contador de secuencia (debounce)
+_MSGS_KEY = "tramibot:buffer:msgs:{conv}"   # lista con los mensajes acumulados
+_SEQ_KEY = "tramibot:buffer:seq:{conv}"     # contador de secuencia (debounce)
 
 # Referencias fuertes a las tareas en vuelo (evita que el GC las cancele).
 _tareas: set = set()

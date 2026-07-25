@@ -1,12 +1,12 @@
 """
-InputGuardrail — Orquestador de Seguridad para el Agente DataBot.
+InputGuardrail — Orquestador de Seguridad para el Agente TramiBot.
 
 Pipeline de validación (8 capas activas):
   1. Secret Keys      (REGEX)    — Claves de API y tokens secretos
   2. Prompt Injection (REGEX)    — Jailbreak, manipulación del sistema
   3. Toxic Patterns   (REGEX)    — Amenazas, hate speech, acoso, autolesión
   4. Custom Regex     (REGEX)    — Patrones configurables por el admin (ReDoS-safe)
-  5. PII Detection    (LOCAL)    — DNI, RUC, Email, Teléfono PE
+  5. PII Detection    (LOCAL)    — Cédula, NIT, Email, Teléfono CO
   6. URL Filter       (REGEX)    — URLs, acortadores y dominios maliciosos
   7. Llama Prompt Guard 2 (GROQ) — Detección de jailbreak/injection por IA
   8. GPT-OSS-Safeguard(GROQ)     — Clasificación NSFW / Violencia / Odio / Autolesión
@@ -331,7 +331,7 @@ _URL_SIN_PROTOCOLO = re.compile(
 # ============================================================
 class InputGuardrail:
     """
-    Orquestador de Seguridad para el Agente DataBot.
+    Orquestador de Seguridad para el Agente TramiBot.
 
     Compila todos los patrones una sola vez al iniciar (más rápido).
     Permite agregar capas 7 y 8 (LlamaGuard) cuando se tenga el código.
@@ -359,7 +359,7 @@ class InputGuardrail:
         try:
             from guardrails.pii_detector import PiiDetector
             self._pii = PiiDetector()
-            logger.info("[GUARDRAIL] Capa 5 — PII Detector activado (DNI, RUC, Email, Teléfono PE)")
+            logger.info("[GUARDRAIL] Capa 5 — PII Detector activado (Cédula, NIT, Email, Teléfono CO)")
         except Exception as e:
             logger.warning(f"[GUARDRAIL] Capa 5 (PII) desactivada: {e}")
 
@@ -577,7 +577,7 @@ def respuesta_bloqueada(motivo: str = "") -> str:
         "prompt_injection": (
             "Lo siento, no puedo procesar ese mensaje. "
             "Por favor, reformula tu pregunta de manera apropiada. "
-            "Estoy aquí para ayudarte con información sobre DATAPATH y consultas generales."
+            "Estoy aquí para ayudarte con los trámites y servicios del Municipio de Girardota."
         ),
         "recon_infraestructura": (
             "Lo siento, no puedo compartir información sobre la arquitectura, "
@@ -587,37 +587,37 @@ def respuesta_bloqueada(motivo: str = "") -> str:
         "contenido_toxico": (
             "Lo siento, no puedo continuar con esa conversación. "
             "Tu mensaje contiene contenido inapropiado. "
-            "Por favor, mantén un trato respetuoso. Estoy aquí para ayudarte con consultas sobre DATAPATH."
+            "Por favor, mantén un trato respetuoso. Estoy aquí para ayudarte con los trámites del Municipio de Girardota."
         ),
         "patron_personalizado": (
             "Lo siento, tu mensaje contiene contenido que no está permitido en esta plataforma. "
             "Por favor, reformula tu consulta. "
-            "Estoy aquí para ayudarte con información sobre DATAPATH."
+            "Estoy aquí para ayudarte con los trámites del Municipio de Girardota."
         ),
         "pii_detectado": (
-            "Lo siento, tu mensaje contiene información personal sensible (DNI, RUC, teléfono, etc.). "
+            "Lo siento, tu mensaje contiene información personal sensible (cédula, NIT, teléfono, etc.). "
             "Por seguridad, no compartas datos personales en el chat. "
             "Escribe tu consulta sin incluir información privada."
         ),
         "url_detectada": (
             "Lo siento, no puedo procesar mensajes que contengan enlaces o URLs. "
             "Por favor, escribe tu pregunta en texto sin incluir links. "
-            "Estoy aquí para ayudarte con información sobre DATAPATH y consultas generales."
+            "Estoy aquí para ayudarte con los trámites y servicios del Municipio de Girardota."
         ),
         "dominio_bloqueado": (
             "Lo siento, tu mensaje contiene un enlace o dominio que no está permitido. "
             "Por favor, escribe tu consulta en texto sin incluir links acortados ni dominios externos. "
-            "Estoy aquí para ayudarte con información sobre DATAPATH."
+            "Estoy aquí para ayudarte con los trámites del Municipio de Girardota."
         ),
         "jailbreak_ia": (
             "Lo siento, no puedo procesar ese mensaje. "
             "Por favor, reformula tu pregunta de manera apropiada. "
-            "Estoy aquí para ayudarte con información sobre DATAPATH y consultas generales."
+            "Estoy aquí para ayudarte con los trámites y servicios del Municipio de Girardota."
         ),
         "contenido_ia_bloqueado": (
             "Lo siento, no puedo continuar con esa conversación. "
             "Tu mensaje contiene contenido que no puedo procesar. "
-            "Por favor, mantén un trato respetuoso. Estoy aquí para ayudarte con consultas sobre DATAPATH."
+            "Por favor, mantén un trato respetuoso. Estoy aquí para ayudarte con los trámites del Municipio de Girardota."
         ),
         "servicio_no_disponible": (
             "Lo siento, el servicio de seguridad no está disponible en este momento. "
