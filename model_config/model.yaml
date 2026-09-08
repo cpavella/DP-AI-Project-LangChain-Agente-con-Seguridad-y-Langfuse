@@ -8,7 +8,7 @@ meta:
 llm:
   provider: openai
   model: gpt-4.1          # modelo por defecto del proyecto
-  temperature: 0.7
+  temperature: 0.4
   # max_tokens, top_p, timeout — comentados hasta que se necesiten
 
 memory:
