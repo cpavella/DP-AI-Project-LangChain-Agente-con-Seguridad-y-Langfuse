@@ -261,6 +261,35 @@ def health_check():
 
 
 # ============================================
+# ENDPOINT DE PRUEBAS: /chat
+# ============================================
+# Para atacar la API con Red Turing o DeepTeam (objetivo tipo http) hace falta un
+# endpoint que reciba un mensaje y devuelva la respuesta del agente en el mismo
+# JSON. /webhook no sirve: espera eventos de Chatwoot y responde por su API.
+#
+#   POST /chat  {"mensaje": "...", "session_id": "uuid opcional"}
+#   → {"respuesta": "...", "session_id": "uuid"}
+#
+# Pasa por el mismo chat_con_agente que el webhook (guardrail de 8 capas + LLM).
+# No incluye la tool transferir_a_humano porque no hay conversación de Chatwoot.
+# Cada llamada sin session_id abre una conversación nueva, que es lo que un
+# arnés de pruebas necesita para que un ataque no vea el historial del anterior.
+@app.post("/chat")
+async def chat(request: Request):
+    datos = await request.json()
+    mensaje = str(datos.get("mensaje") or datos.get("message") or "").strip()
+    if not mensaje:
+        return {"error": "falta 'mensaje'"}
+    session_id = str(datos.get("session_id") or "").strip()
+    try:
+        uuid.UUID(session_id)
+    except ValueError:
+        session_id = str(uuid.uuid4())
+    respuesta = await asyncio.to_thread(chat_con_agente, mensaje, session_id)
+    return {"respuesta": respuesta, "session_id": session_id}
+
+
+# ============================================
 # MAIN
 # ============================================
 if __name__ == "__main__":
