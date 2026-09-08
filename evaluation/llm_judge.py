@@ -2,14 +2,19 @@
 LLM-as-a-Judge: evaluación automática de respuestas de TramiBot.
 
 Usa un LLM barato (GPT-4o-mini) para evaluar cada respuesta del agente de trámites
-del Municipio de Girardota en cinco dimensiones y envía los scores a Langfuse.
+del Municipio de Girardota en siete dimensiones y envía los scores a Langfuse.
 
-Scores registrados:
+Scores registrados (escala 0.0-1.0):
   - relevancia-tramites : ¿La respuesta habló de trámites/servicios del municipio?
   - calidad-respuesta   : ¿Fue útil, clara y correcta?
   - alucinacion         : ¿Inventó requisitos, documentos, tiempos, costos o dependencias?
   - completitud-tramite : ¿Entregó la información clave del trámite solicitado?
   - rechazo-correcto    : ¿Rechazó bien preguntas fuera del ámbito municipal?
+
+Scores registrados (escala Likert 1-5):
+  - sentimiento-usuario  : Ánimo del ciudadano en su mensaje (1=triste, 5=muy contento)
+  - expresividad-agente  : Qué tan expresivo fue el bot frente a la postura del ciudadano
+                           (1=plano/robótico, 5=muy expresivo y bien sintonizado)
 
 Diseño intencionado:
 - Módulo independiente: no importa nada del agente, solo Langfuse y LangChain.
@@ -35,12 +40,12 @@ from langfuse import get_client
 # ============================================
 # Usamos GPT-4o-mini para mantener el costo de evaluación bajo.
 # Temperatura 0 para respuestas deterministas y JSON consistente.
-_chat_judge = init_chat_model("gpt-4o-mini", temperature=0)
+_chat_judge = init_chat_model("gpt-4.1", temperature=0)
 
 # ============================================
 # PROMPT DEL JUEZ
 # ============================================
-# Pide un JSON con exactamente 6 campos. Las llaves dobles {{ }} son
+# Pide un JSON con exactamente 8 campos. Las llaves dobles {{ }} son
 # literales en str.format() (escapan las llaves del JSON de la respuesta).
 _JUDGE_PROMPT = """Eres un evaluador experto de chatbots de atención ciudadana.
 
@@ -52,13 +57,15 @@ MENSAJE DEL CIUDADANO:
 RESPUESTA DEL BOT:
 {respuesta}
 
-Evalúa en cinco dimensiones y responde ÚNICAMENTE con JSON válido (sin markdown, sin explicaciones extra):
+Evalúa en siete dimensiones y responde ÚNICAMENTE con JSON válido (sin markdown, sin explicaciones extra):
 {{
   "relevancia": <float 0.0-1.0>,
   "calidad": <float 0.0-1.0>,
   "alucinacion": <float 0.0-1.0>,
   "completitud": <float 0.0-1.0>,
   "rechazo_correcto": <float 0.0-1.0>,
+  "sentimiento_usuario": <entero 1-5>,
+  "expresividad_agente": <entero 1-5>,
   "razon": "<máximo 100 caracteres>"
 }}
 
@@ -68,7 +75,33 @@ Definiciones:
 - alucinacion:      ¿El bot inventó datos específicos que no puede conocer (requisitos, documentos, tiempos de obtención, costos, nombres de secretarías/dependencias)? 0=no inventó nada, 1=inventó datos concretos. Si la pregunta no aplica, pon 0.
 - completitud:      Cuando el ciudadano pregunta por un trámite, ¿la respuesta entregó la información clave solicitada (propósito, requisitos/documentos, tiempo de obtención y/o dependencia responsable)? 0=muy incompleta, 1=completa y accionable. Si la pregunta no aplica (ej. un saludo), pon 0.5.
 - rechazo_correcto: Si el ciudadano preguntó algo fuera del ámbito del municipio (otro municipio, cultura general, etc.), ¿el bot lo rechazó correctamente con amabilidad? 0=respondió sin rechazar (MAL), 1=rechazó correctamente (BIEN). Si la pregunta SÍ era sobre el municipio, pon 1.
+- sentimiento_usuario: Estado de ánimo que transmite el MENSAJE DEL CIUDADANO, en escala Likert:
+                       1=muy triste, molesto o frustrado (queja, reclamo, desesperación)
+                       2=triste, incómodo o impaciente
+                       3=neutral (consulta informativa sin carga emocional)
+                       4=contento, amable o agradecido
+                       5=muy contento, entusiasta o efusivo
+                       Juzga solo el mensaje del ciudadano, no la respuesta del bot. Si no hay señales emocionales, pon 3.
+- expresividad_agente: ¿Qué tan expresivo fue el BOT frente a la postura emocional del ciudadano (la que mediste en sentimiento_usuario)? Escala Likert:
+                       1=plano y robótico, ignora por completo el estado emocional del ciudadano
+                       2=apenas cortés, formulismo sin reconocer la emoción
+                       3=reconoce el tono de forma genérica ("entiendo", "con gusto")
+                       4=expresivo y bien sintonizado: nombra la emoción y ajusta el tono (empatiza si está molesto, acompaña si está contento)
+                       5=muy expresivo y perfectamente calibrado con la emoción del ciudadano, sin sonar exagerado ni falso
+                       Penaliza el desajuste: entusiasmo festivo ante un ciudadano molesto, o frialdad ante un ciudadano angustiado, no pasa de 2.
+                       Si sentimiento_usuario=3 (neutral), una respuesta informativa, cortés y que resuelve la consulta es un 3; reserva 1-2 para respuestas cortantes o descuidadas, y 4-5 para las que además cierran con calidez o se ofrecen a acompañar.
 - razon:            Razón breve que justifica los puntajes más bajos o llamativos"""
+
+
+# ============================================
+# HELPERS
+# ============================================
+def _a_likert(valor, defecto: int = 3) -> int:
+    """Convierte un valor del juez a un entero Likert válido (1-5)."""
+    try:
+        return max(1, min(5, int(round(float(valor)))))
+    except (TypeError, ValueError):
+        return defecto
 
 
 # ============================================
@@ -82,12 +115,17 @@ def evaluar_con_llm_judge(
     """
     Evalúa la respuesta de TramiBot con un LLM juez y envía los scores a Langfuse.
 
-    Scores que se registran (todos float 0-1):
+    Scores en escala 0-1 (float):
       - "relevancia-tramites" : ¿La respuesta habló de trámites/servicios del municipio?
       - "calidad-respuesta"   : ¿Fue útil, clara y correcta?
       - "alucinacion"         : ¿Inventó requisitos, documentos, tiempos u otros datos?
       - "completitud-tramite" : ¿Entregó la información clave del trámite solicitado?
       - "rechazo-correcto"    : ¿Rechazó bien preguntas fuera del ámbito municipal?
+
+    Scores en escala Likert 1-5 (int):
+      - "sentimiento-usuario" : Ánimo del ciudadano (1=triste, 3=neutral, 5=muy contento)
+      - "expresividad-agente" : Expresividad del bot frente a la postura del ciudadano
+                                (1=plano/robótico, 5=muy expresivo y bien calibrado)
 
     Todos los scores quedan visibles en:
       Langfuse UI → Tracing → (click en el trace) → sección Scores
@@ -118,10 +156,16 @@ def evaluar_con_llm_judge(
         rechazo_correcto = max(0.0, min(1.0, float(eval_data.get("rechazo_correcto", 1.0))))
         razon            = str(eval_data.get("razon", ""))[:100]
 
+        # Escalas Likert 1-5: se sanean aparte porque no comparten el rango 0-1.
+        # Por defecto 3 = neutral / expresividad genérica, para no premiar ni castigar
+        # cuando el juez no devuelve el campo.
+        sentimiento_usuario = _a_likert(eval_data.get("sentimiento_usuario"), defecto=3)
+        expresividad_agente = _a_likert(eval_data.get("expresividad_agente"), defecto=3)
+
         # Obtener el cliente Langfuse (singleton ya inicializado en el agente)
         lf = get_client()
 
-        # Langfuse v4: método create_score() — enviar los 5 scores al trace actual
+        # Langfuse v4: método create_score() — enviar los 7 scores al trace actual
         lf.create_score(
             trace_id=trace_id,
             name="relevancia-tramites",
@@ -160,6 +204,24 @@ def evaluar_con_llm_judge(
             data_type="NUMERIC",
             comment=razon,
         )
+        # sentimiento-usuario: Likert 1-5 sobre el mensaje del ciudadano
+        # (1=triste/molesto, 3=neutral, 5=muy contento). No mide al bot.
+        lf.create_score(
+            trace_id=trace_id,
+            name="sentimiento-usuario",
+            value=sentimiento_usuario,
+            data_type="NUMERIC",
+            comment=razon,
+        )
+        # expresividad-agente: Likert 1-5 sobre cuánta expresividad mostró el bot
+        # frente a la postura emocional del ciudadano (1=plano, 5=muy expresivo)
+        lf.create_score(
+            trace_id=trace_id,
+            name="expresividad-agente",
+            value=expresividad_agente,
+            data_type="NUMERIC",
+            comment=razon,
+        )
 
         print(
             f"   📊 [JUDGE] "
@@ -168,6 +230,8 @@ def evaluar_con_llm_judge(
             f"alucinacion={alucinacion:.2f} | "
             f"completitud={completitud:.2f} | "
             f"rechazo={rechazo_correcto:.2f} | "
+            f"sentimiento={sentimiento_usuario}/5 | "
+            f"expresividad={expresividad_agente}/5 | "
             f"{razon[:50]}"
         )
 

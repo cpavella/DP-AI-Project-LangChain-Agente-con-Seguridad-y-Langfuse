@@ -51,7 +51,7 @@ Usuario envía mensaje por WhatsApp
 │       ├── Tool Execution (buscar_datapath, etc.)    │
 │       └── LLM Call 2 (respuesta final)       ◄── Langfuse registra tokens, latencia, costo
 │                                                     │
-│  LLM-as-a-Judge ◄── Evalúa la respuesta (5 scores) │
+│  LLM-as-a-Judge ◄── Evalúa la respuesta (7 scores) │
 └─────────────────────────────────────────────────────┘
               │
               ▼
@@ -242,15 +242,15 @@ Usuario: "¿Qué cursos tiene DATAPATH?"
         evaluar_con_llm_judge() ← juez evalúa la respuesta
                 │
                 ▼
-        5 scores enviados a Langfuse
+        7 scores enviados a Langfuse
                 │
                 ▼
         Respuesta enviada al usuario por WhatsApp
 ```
 
-### Los 5 Scores de Evaluación
+### Los 7 Scores de Evaluación
 
-Cada turno de conversación recibe 5 puntuaciones automáticas, todas en escala de 0.0 a 1.0:
+Cada turno de conversación recibe 7 puntuaciones automáticas: cinco en escala de 0.0 a 1.0 y dos en escala Likert de 1 a 5.
 
 #### Score 1 — `relevancia-datapath`
 **¿La respuesta estuvo enfocada en DATAPATH?**
@@ -292,6 +292,28 @@ Este score mide si el agente está cumpliendo su rol comercial: no solo informar
 
 > Los guardrails de seguridad bloquean mensajes peligrosos **antes** de que lleguen al agente. Este score es diferente: mide si el agente rechaza preguntas válidas pero fuera de su ámbito (ej. "¿quién ganó el Mundial?"), que los guardrails dejan pasar porque no son peligrosas.
 
+#### Score 6 — `sentimiento-usuario` (Likert 1-5)
+**¿Con qué ánimo escribió el ciudadano?**
+
+- `1` = Muy triste, molesto o frustrado (queja, reclamo, desesperación)
+- `2` = Triste, incómodo o impaciente
+- `3` = Neutral (consulta informativa sin carga emocional)
+- `4` = Contento, amable o agradecido
+- `5` = Muy contento, entusiasta o efusivo
+
+Este score mide **al ciudadano, no al bot**: se juzga únicamente el mensaje de entrada. Sirve para detectar si el canal está recibiendo sobre todo consultas neutrales o una ola de reclamos, y es la base de comparación del Score 7.
+
+#### Score 7 — `expresividad-agente` (Likert 1-5)
+**¿Qué tan expresivo fue el bot frente a la postura emocional del ciudadano?**
+
+- `1` = Plano y robótico, ignora por completo el estado emocional
+- `2` = Apenas cortés, formulismo sin reconocer la emoción
+- `3` = Reconoce el tono de forma genérica ("entiendo", "con gusto")
+- `4` = Expresivo y bien sintonizado: nombra la emoción y ajusta el tono
+- `5` = Muy expresivo y perfectamente calibrado, sin sonar exagerado ni falso
+
+> Este score es **relativo** al Score 6: no premia expresividad en abstracto, sino el ajuste a la postura del humano. El desajuste se penaliza en ambas direcciones — entusiasmo festivo ante un ciudadano molesto, o frialdad ante un ciudadano angustiado, no pasa de `2`. Cuando el ciudadano llega neutral (`sentimiento-usuario = 3`), una respuesta informativa y cortés que resuelve la consulta vale `3`: la rúbrica no exige efusividad donde no hay emoción que acompañar. Leer los dos scores juntos (`sentimiento-usuario` vs `expresividad-agente`) muestra si el tono del `system_prompt` está acompañando bien al ciudadano.
+
 ### Funcionamiento silencioso
 
 El juez se ejecuta de forma silenciosa: si falla por cualquier razón (timeout, respuesta mal formateada, error de API), el agente **no se cae** ni se interrumpe la conversación. El fallo del juez solo genera un log de advertencia en la terminal:
@@ -302,7 +324,7 @@ El juez se ejecuta de forma silenciosa: si falla por cualquier razón (timeout, 
 
 ### ¿Qué se ve en el dashboard?
 
-En **Langfuse → Tracing → (click en un trace)**: los 5 scores aparecen en la sección **Scores** del panel derecho, vinculados directamente al trace del turno evaluado.
+En **Langfuse → Tracing → (click en un trace)**: los 7 scores aparecen en la sección **Scores** del panel derecho, vinculados directamente al trace del turno evaluado.
 
 En **Langfuse → Evaluation → Scores → Analytics**: vista agregada de todos los scores en el tiempo, con gráficos de tendencia para monitorear si la calidad del agente sube o baja con el tiempo.
 
@@ -361,7 +383,7 @@ El verdadero valor de tener ambos sistemas (automático y manual) es la **correl
 | Observabilidad (Tracing) | `@observe()` + `CallbackHandler` | Sí | Tracing, Sessions, Users |
 | Sesiones y Usuarios | Session Tracking automático | Mínimo (session_id) | Sessions, Users |
 | Prompt Management | `get_prompt()` del SDK | Opcional (comentado) | Prompt Management |
-| LLM-as-a-Judge (5 scores) | GPT-4o-mini + `create_score()` | Sí (`evaluation/llm_judge.py`) | Evaluation → Scores |
+| LLM-as-a-Judge (7 scores) | GPT-4o-mini + `create_score()` | Sí (`evaluation/llm_judge.py`) | Evaluation → Scores |
 | Human Annotation | Queues de revisión manual | No | Evaluation → Human Annotation |
 
 ---

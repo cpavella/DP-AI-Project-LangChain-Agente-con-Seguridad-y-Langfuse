@@ -121,7 +121,7 @@ Queues de revisión manual para que el equipo de DATAPATH evalúe conversaciones
 │   └── llama_guard_service.py                       # Capas 7 y 8 — LlamaGuard via Groq
 ├── evaluation/
 │   ├── __init__.py
-│   └── llm_judge.py                                 # LLM-as-a-Judge (5 scores → Langfuse)
+│   └── llm_judge.py                                 # LLM-as-a-Judge (7 scores → Langfuse)
 ├── requirements.txt
 └── .env                                             # Variables de entorno (no subir a git)
 ```
@@ -202,7 +202,7 @@ Endpoints disponibles:
 | Método | Ruta | Descripción |
 |---|---|---|
 | `POST` | `/webhook` | Recibe eventos de Chatwoot |
-| `POST` | `/test` | Prueba el agente sin Chatwoot |
+| `POST` | `/chat` | Prueba el agente sin Chatwoot: `{"mensaje": "...", "session_id": "uuid opcional"}` → `{"respuesta": "..."}`. Es el endpoint que atacan Red Turing y DeepTeam como objetivo `http` |
 | `GET` | `/health` | Estado del servicio |
 | `GET` | `/` | Info del servicio |
 
