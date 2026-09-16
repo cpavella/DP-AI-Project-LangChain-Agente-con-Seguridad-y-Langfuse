@@ -105,8 +105,8 @@ def _contexto_fecha_hora() -> str:
 # El system prompt vive desacoplado en prompt/system_prompt.yaml y se carga con
 # load_system_prompt(). Para ajustar la persona del agente solo se edita el YAML.
 # ============================================
-#system_prompt = load_system_prompt()
-#print("📝 Prompt cargado desde YAML: prompt/system_prompt.yaml")
+system_prompt = load_system_prompt()
+print("📝 Prompt cargado desde YAML: prompt/system_prompt.yaml")
 
 # ============================================
 # ALTERNATIVA: PROMPT DESDE LANGFUSE (Prompt Management)
@@ -122,9 +122,10 @@ def _contexto_fecha_hora() -> str:
 # Ventaja: puedes cambiar el prompt desde la UI sin tocar código ni reiniciar el servidor
 # Desventaja: el prompt sale del repo y no puedes editarlo con vibe coding en Cursor
 # ============================================
-lf_prompt = langfuse_client.get_prompt("Prompt-del-Agente-Tramites-Girardota")
-system_prompt = lf_prompt.compile()   # sin variables; si tuvieras usa compile(var=valor)
-print(f"📝 Prompt cargado desde Langfuse: versión {lf_prompt.version}")
+
+#lf_prompt = langfuse_client.get_prompt("Prompt-del-Agente-Tramites-Girardota")
+#system_prompt = lf_prompt.compile()   # sin variables; si tuvieras usa compile(var=valor)
+#print(f"📝 Prompt cargado desde Langfuse: versión {lf_prompt.version}")
 
 # ============================================
 # 5. CREAR TABLA DE HISTORIAL (chat_history/)

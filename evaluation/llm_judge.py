@@ -40,7 +40,7 @@ from langfuse import get_client
 # ============================================
 # Usamos GPT-4o-mini para mantener el costo de evaluación bajo.
 # Temperatura 0 para respuestas deterministas y JSON consistente.
-_chat_judge = init_chat_model("gpt-4.1", temperature=0)
+_chat_judge = init_chat_model("gpt-4o-mini", temperature=0)
 
 # ============================================
 # PROMPT DEL JUEZ
